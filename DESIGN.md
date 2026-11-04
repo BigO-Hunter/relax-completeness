@@ -26,8 +26,39 @@ the walk's prefix squeezes the stored value onto a simple-walk cost.
 Deviation (documented in `Pillar2.lean`): `lfp T_BF` is degenerate (0-weight self-loop),
 so the identification proved is greatest-fixed-point-below-`dInit` = `distV`, not lfp.
 
-**(iii) Box-certification.** `settled-under-monotone-cut ⇒ final + frozen-lock`, the
-frozen-lock device from Zhao's fast-sweeping method. Later.
+**(iii) Box-certification.** DONE — `Pillar3.lean`, zero sorries. Headline:
+`CertifiedRun.certified_settled_final` — **settlement under a certified boundary implies
+finality** (`v ∈ U_t ⇒ d_t v = distV w s v`) for the minimal synchronous engine
+(`CertState = (d, U, B)`; steps: `relax` at `u ∈ U` fires the out-edge push
+`pushUpdate`, `settle` at `v ∉ U` under rule `d v ≤ B` + box condition
+`B ≤ ⨅ (u ∉ insert v U), d u` — the beyond-dijkstra `dB[D] ≥ B′` invariant — and fires
+the push at `v` **atomically**). Support: invariant 1 `distV_le_d` (values overestimate
+truth), `d_antitone` (monotone nonincreasing), `settled_edges_relaxed` (settled out-edges
+stay relaxed — the induction fuel), `frozen_lock` (Zhao: settled ⇒ value never changes
+again; two-line consequence of certification + overestimation), `trivialRun`
+(non-vacuity: settle `s` first, re-relax forever; the `⊤` start boundary forces the
+first settlement to be the source).
+**Two forced modelling decisions (honesty ledger):**
+1. *Settle-without-relaxation is a real loophole.* A pure settle step (no atomic push)
+   makes the certification theorem FALSE: on `s →(1) a →(1) v`, `s →(5) v` — settle `s`
+   (B=1), relax at `s`, settle `a` with B=5 (rule `1≤5` ✓, box `5 ≤ d v = 5` ✓), then
+   settle `v` with stale `d v = 5 ≤ B` over the empty frontier — while `distV v = 2`.
+   The synchronous engine therefore fires the out-edge updates as part of settling
+   ("settlement of u fires T_u", Dijkstra/FMM semantics). The proof consumes this via
+   `settled_edges_relaxed`.
+2. *The box ranges over the post-settle unsettled set* (`u ∉ insert v U` — "boundary
+   never exceeds the *remaining* unsettled values"). Ranging over `u ∉ U` (incl. `v`)
+   would force `d v = B` at every settle: extract-min with a frozen boundary, a strictly
+   smaller engine class. Present rules = weaker premises = stronger theorem; with `B`
+   existentially quantified they collapse exactly to Dijkstra extract-min
+   (`∃ B, d v ≤ B ≤ ⨅ frontier d ↔ d v ≤ ⨅ frontier d`). The async echo-sweep engine is
+   the refinement: echo sweeps re-fire `relax` steps and `frozen_lock` licenses skipping
+   re-expansion of certified vertices.
+Proof shape: simultaneous induction (certification + relaxed-out-edges); the settle case
+runs the first-unsettled-on-shortest-walk argument as a two-bound walk induction
+(`cost Q < x` ∧ `cost Q < d y` ⇒ False): settled penultimate vertex ⇒ relaxed-edge cap
+contradiction; unsettled penultimate ⇒ box condition chains the bound and the shorter
+prefix recurses; `nil` ⇒ `0 < d s = 0`.
 
 ## Setting
 
@@ -122,9 +153,20 @@ canonical point is the GREATEST fixed point below `dInit` and equals `distV`
 | (new, pillar ii) `cases` on a term whose family INDEX is a non-variable (e.g. `q : Walk s (seq n)`) cannot substitute the index in constructor branches — factor decomposition lemmas with a free endpoint var (`exists_step_of_endpoint_ne`) and instantiate | |
 | (new, pillar ii) `obtain ⟨n, rfl⟩` from `Set.mem_range` leaves a beta-redex `(fun n => f n) n` in the goal that `rw [h : f n = _]` cannot match — `dsimp only` first | |
 | (new, pillar ii) `le_antisymm` takes (A ≤ B) then (B ≤ A); with `⊓` displayed as `min` in ℝ≥0∞ it is easy to flip — check which side is the goal's LHS | |
+| (new, pillar iii) `Finset.insert` is NOT a constant in this pin — use generic `insert` (Insert.insert); `le_of_not_lt`/`lt_of_not_le` ABSENT — use `not_lt.mp`/`not_le.mp`; `Finset.not_mem_singleton` ABSENT — derive `v ≠ s` from `v ∉ insert s ∅` by `intro heq; exact h (by rw [heq])` (the rw CLOSES the goal by defeq — a trailing `simp` then dies "No goals") | |
+| (new, pillar iii) `cases Q` on `Q : Walk s y` with `y` a LOCAL: the endpoint index ABSORBS the `step` binder — `\| step a b q` leaves `b` "Unknown identifier" (replaced by `y` everywhere). Write `\| step a _ q` and refer to the endpoint as `y`. (Sibling of the non-variable-index landmine above.) | |
+| (new, pillar iii) `obtain ⟨k, rfl⟩ := Nat.le.dest h` then `induction k`: the residual `h : m ≤ m + k` mentions `k` and gets swept into the motive (IH gains a hypothesis arrow) — `clear h` before inducting | |
+| (new, pillar iii) `structure Foo where` under section variables auto-includes them as EXPLICIT params — `CertState` became `CertState V`; declare `(V : Type u)` in the header yourself. Dot-notation `run.lemma` needs the lemma named inside `namespace CertifiedRun` | |
+| (new, pillar iii) `set_option linter.unusedSectionVars false in universe u v` is a syntax ERROR and bare `... false` before other commands must be standalone (with `in` it applies to only the next decl); `omit [X] in` may NOT follow a doc comment ("unexpected token") — set the option file-wide instead | |
 
 ## Status / next step
 
-Pillars (i) and (ii) COMPLETE, `lake build` green, zero sorries. See the status ledger
-docstring at the end of `RelaxLFP.lean` and `Pillar2.lean` (headline:
-`canonical_point_eq_distV`). Next: pillar (iii), box-certification / frozen-lock.
+All three pillars COMPLETE, `lake build` green, zero sorries. See the status ledger
+docstrings at the end of `RelaxLFP.lean`, `Pillar2.lean` (headline:
+`canonical_point_eq_distV`), and `Pillar3.lean` (headline:
+`certified_settled_final` + `frozen_lock`). `lakefile.toml` defaultTargets:
+`RelaxLFP`, `Pillar2`, `Pillar3`. Next (successor's choice): the async echo-sweep
+refinement of `Pillar3` (echo sweeps as re-fired `relax` steps, `frozen_lock` as the
+skip-re-expansion license), or wiring the certification layer to the beyond-dijkstra
+engine's `dB[D] ≥ B′` cut sets (Lemmas W/V/d2 of the cousot recast are the missing
+box verification there).

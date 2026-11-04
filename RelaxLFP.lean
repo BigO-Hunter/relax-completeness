@@ -19,7 +19,8 @@ start vector.  Architecture (see `DESIGN.md`):
 
 * (i) fair-schedule iteration → canonical point — THIS FILE, finite case, direct proof;
 * (ii) that point = true distances — later (AFP ShortestPath pattern);
-* (iii) box-certification / frozen-lock — later (Zhao fast-sweeping).
+* (iii) box-certification / frozen-lock — `Pillar3.lean` (DONE: settled under a
+  certified boundary ⇒ final, Zhao frozen-lock).
 
 Design notes:
 * The update is **capped** (`d v ⊓ T d v`), so iterates are antitone with *no* assumption
@@ -656,5 +657,5 @@ finiteness of length-bounded and simple walks (`Walk.finite_length_le`,
 `le_distV_of_le_T_BF`, and the headline `canonical_point_eq_distV` — the fair-iteration
 limit IS the true shortest-distance vector.
 
-Next: pillar (iii) — box certification / frozen-lock (Zhao fast-sweeping).
+Next: pillar (iii) — DONE in `Pillar3.lean` (`certified_settled_final`, `frozen_lock`).
 -/
