@@ -10,10 +10,21 @@ proven-working sssp-bridge scaffold; manifest copied verbatim — it has no root
 Any fair schedule of capped point-relaxations converges, and its limit is characterized
 order-theoretically. Tonight's work; see statement below.
 
-**(ii) That point = the true distances.** Via the AFP ShortestPath pattern: the limit
-`c ≤ T c`, `c ≤ d₀` gives `c ≤ δ` by path telescoping; the invariant `δ ≤ dₙ` for all `n`
-(monotonicity + `δ = T δ` + capping) gives `δ ≤ c`. Together with (i)'s greatestness this
-also identifies `c` with `lfp T` inside `↓d₀` when `T d₀ ≤ d₀`. Later.
+**(ii) That point = the true distances.** DONE — `Pillar2.lean` + the value-universe half of
+`RelaxLFP.lean`, zero sorries. Headline: `canonical_point_eq_distV` — the fair-iteration
+limit is the greatest fixed point of `T_BF` below `dInit` and equals `distV` (infimum of
+walk costs). `≤` arm: post-fixed points sit below every walk cost (`le_cost_of_le_T_BF`,
+the AFP `dist_le_cost` template :73–100) hence below `distV` (`le_distV_of_le_T_BF`).
+`≥` arm: `distV` is itself post-fixed and below `dInit` (`distV_le_T_BF`, `distV_le_dInit`),
+absorbed by pillar (i)'s greatestness. The AFP `num`/`just`/`witness_path` machinery is
+NOT needed: defining `d*` as an infimum over walks (not an attained minimum) deletes
+`witness_path` — the NOTE's biggest rebuild item — entirely. The seam
+(`iterate_range_finite`: every iterate value is `⊤` or a simple-walk cost) is closed via
+`iterate_value_universe` with a prefix-tightness invariant (`Walk.Tight`, `Walk.IsPrefix`):
+when the proposal attains at a `u₀` whose witness walk passes through the updated vertex,
+the walk's prefix squeezes the stored value onto a simple-walk cost.
+Deviation (documented in `Pillar2.lean`): `lfp T_BF` is degenerate (0-weight self-loop),
+so the identification proved is greatest-fixed-point-below-`dInit` = `distV`, not lfp.
 
 **(iii) Box-certification.** `settled-under-monotone-cut ⇒ final + frozen-lock`, the
 frozen-lock device from Zhao's fast-sweeping method. Later.
@@ -52,7 +63,8 @@ per component is the set of **simple-path sums** (plus ⊤). On a finite graph t
 finite, so each component's iterate sequence is antitone with finite range ⇒ eventually
 constant (strict-drop indices inject into the finite range); `Fintype V` promotes
 per-component stabilization to a uniform `N`. The instance lemma "every value ever taken
-is a simple-path sum" is the pillar-(ii) seam and is left as a named sorry.
+is a simple-path sum" (`iterate_value_universe` ⇒ `iterate_range_finite`) was the
+pillar-(ii) seam and is now CLOSED (prefix-tightness induction, see pillar (ii) above).
 
 ## Deviation from Daggitt (arXiv 2012.01686) — deliberate
 
@@ -62,6 +74,11 @@ elements (e.g. the constant-0 function with nonnegative weights), so "least" is 
 general. When `T d₀ ≤ d₀` (true for the SSSP ⊤-start: `T d₀ ≤ d₀`), greatest-post-fixed
 below `d₀` coincides with the least fixed point of `T` in `↓d₀`; that identification is
 assigned to pillar (ii). All finite-setting proofs here are elementary lattice arguments.
+**Pillar-(ii) resolution:** for `T_BF` the lfp identification is FALSE as stated (a
+`0`-weight self-loop makes constant-`0` a fixed point below `dInit`, so the lfp in `↓d₀`
+is degenerate); what pillar (ii) proves instead — and what SSSP needs — is that the
+canonical point is the GREATEST fixed point below `dInit` and equals `distV`
+(`fixed_of_greatest_postFixed` + `canonical_point_eq_distV`).
 
 ## Citations
 
@@ -93,7 +110,21 @@ assigned to pillar (ii). All finite-setting proofs here are elementary lattice a
 | (new, pin d13f23b7) `Finset.le_sup` cannot infer `f` from a bare-variable goal — pass `(f := id)` explicitly | |
 | (new) `rw` is syntactic: `M+1+(k+1)` ≠ `M+1+k+1` — `rw [Nat.add_succ]` first | |
 | (new) anonymous `⟨a,b,c,d⟩` must match the statement's right-nested `∧` structure — parenthesize sub-conjunctions explicitly | |
+| (new, pillar ii) `subst h` with `h : x = y` where BOTH sides are free locals may eliminate the WRONG one — it ate the section var `s` (3x) and a `cases` binder `b` (1x), leaving "Unknown identifier". Always write `subst v` naming the variable to eliminate | |
+| (new, pillar ii) this pin's `zero_le : ∀ {α} [LE α] [Zero α] [IsBotZeroClass α] {a : α}, 0 ≤ a` is ALL-IMPLICIT — `zero_le _` fails "Function expected"; use bare `zero_le` | |
+| (new, pillar ii) `ENNReal.iInf_add` lives in `Mathlib.Basic.ENNReal.Operations`, NOT imported by `Mathlib.Basic.ENNReal.Basic` | |
+| (new, pillar ii) `List.nodup_append` yields `l.Nodup ∧ l'.Nodup ∧ ∀ a ∈ l, ∀ b ∈ l', a ≠ b` — the third component is the UNFOLDED disjoint; `.disjoint` dot-projection fails, apply it as a 4-arg function | |
+| (new, pillar ii) `simp ... at h` AUTO-CLOSES the goal when `h` simplifies to `False` — any chained tactic (`; omega`) then dies "No goals to be solved". Same with `rw` on `x ≤ x` goals (le_rfl is `@[refl]`): drop the trailing `exact le_rfl` | |
+| (new, pillar ii) `omega` cannot see through `p ∈ {q | cond}` membership — insert `show <arith statement>` (defeq via `Set.mem_setOf`) before `omega` | |
+| (new, pillar ii) `Finset.induction_on` IH is gated on `a ∉ s` — unusable when the `a ∈ s` case needs it. For ℝ≥0∞ iInf attainment use `Set.exists_min_image s f (hfin : s.Finite) (hne : s.Nonempty)` from `Mathlib.Data.Set.Finite.Lemmas`. ABSENT in this pin: `Finset.min'`, `Set.Finite.min'`, `Set.Finite.exists_eq_iInf`, `ENNReal.iInf_eq_iMin`, `Finset.iInf_eq_sInf` | |
+| (new, pillar ii) `Set.finite_iUnion` lives in `Mathlib.Data.Set.Finite.Lattice`; `List.Nodup.length_le_card` and `List.finite_length_le` exist | |
+| (new, pillar ii) `rw` through a dependent proof arg fails "motive is not type correct" (e.g. rewriting `insert a ∅` inside `(insert a ∅).inf' H f` where `H` mentions it) — prefer formulations without dependent proof args | |
+| (new, pillar ii) `cases` on a term whose family INDEX is a non-variable (e.g. `q : Walk s (seq n)`) cannot substitute the index in constructor branches — factor decomposition lemmas with a free endpoint var (`exists_step_of_endpoint_ne`) and instantiate | |
+| (new, pillar ii) `obtain ⟨n, rfl⟩` from `Set.mem_range` leaves a beta-redex `(fun n => f n) n` in the goal that `rw [h : f n = _]` cannot match — `dsimp only` first | |
+| (new, pillar ii) `le_antisymm` takes (A ≤ B) then (B ≤ A); with `⊓` displayed as `min` in ℝ≥0∞ it is easy to flip — check which side is the goal's LHS | |
 
 ## Status / next step
 
-See `RelaxLFP.lean` docstring at the end for the honest status ledger.
+Pillars (i) and (ii) COMPLETE, `lake build` green, zero sorries. See the status ledger
+docstring at the end of `RelaxLFP.lean` and `Pillar2.lean` (headline:
+`canonical_point_eq_distV`). Next: pillar (iii), box-certification / frozen-lock.

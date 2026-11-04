@@ -1,9 +1,12 @@
 name = "relax-completeness"
 version = "0.1.0"
-defaultTargets = ["RelaxLFP"]
+defaultTargets = ["RelaxLFP", "Pillar2"]
 
 [[lean_lib]]
 name = "RelaxLFP"
+
+[[lean_lib]]
+name = "Pillar2"
 
 [[require]]
 name = "mathlib"
