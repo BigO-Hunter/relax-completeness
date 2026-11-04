@@ -4,7 +4,7 @@ Lean 4 / Mathlib formalization. Package `relax-completeness`, default target `Re
 Toolchain `leanprover/lean4:v4.34.1`, Mathlib pinned at `d13f23b7` (copied from the
 proven-working sssp-bridge scaffold; manifest copied verbatim — it has no root entry).
 
-## The three pillars (fixed architecture)
+## The four pillars (fixed architecture)
 
 **(i) Fair-schedule iteration → canonical point.** FINITE case, direct proof.
 Any fair schedule of capped point-relaxations converges, and its limit is characterized
@@ -59,6 +59,43 @@ runs the first-unsettled-on-shortest-walk argument as a two-bound walk induction
 (`cost Q < x` ∧ `cost Q < d y` ⇒ False): settled penultimate vertex ⇒ relaxed-edge cap
 contradiction; unsettled penultimate ⇒ box condition chains the bound and the shorter
 prefix recurses; `nil` ⇒ `0 < d s = 0`.
+
+**(iv) Async refinement.** DONE — `Pillar4.lean`, zero sorries (axioms: propext,
+Classical.choice, Quot.sound only). The async engine: `AsyncState = (d, U, B, P)` with
+pending-push set `P : Finset (V × V)`; steps `BlindStep`: apply-push (re-reads CURRENT
+`d u` — pushes carry no values, echo-sweep semantics), echo-sweep at `u ∈ U` (out-edges
+enter `P`), settle (rule `d v ≤ B` + frontier box, `d` UNCHANGED, out-edges merely
+enqueued, `post.B` unconstrained). **The central question, answered both directions:**
+* POSITIVE — the exact soundness condition is the null-message/lookahead box
+  `LookaheadBoxed`: at every settle (detected by `U` gaining an element), `B ≤ d u + w u x`
+  for every pending `(u,x) ∈ pre.P` (pre-settle range: `v`'s own new pushes may sit below
+  `B` legitimately). `AsyncRun.certified_settled_final_async`: under it, `v ∈ U_t ⇒
+  d_t v = distV v`. The pillar-(iii) walk induction extends via the async edge-accounting
+  invariant `settled_edges_accounted` (`b ∈ U ⇒ d y ≤ d b + w b y ∨ (b,y) ∈ P`): the
+  settled-penultimate case splits relaxed (cap contradiction, as before) / PENDING (the
+  lookahead box chains `x ≤ B ≤ d a + w a y ≤ cost Q`). Invariant maintenance under
+  apply-push needs certification itself (a push can lower a settled TARGET only if it was
+  uncertified) — simultaneous induction, and the theorem genuinely requires soundness.
+* NEGATIVE — `certification_fails_without_lookahead`: concrete blind-legal run on
+  `s →(1) a →(1) v`, `s →(5) v` (Fin 3, `cexRun`): settle s (B:=5), apply (s,a), settle a,
+  apply (s,v), settle v at stale `5` over the empty frontier while pending `(a,v)` has
+  potential `2 < 5`; `distV v = 2`. `cex_lookahead_violated`: the box fails at precisely
+  that settle — the lookahead clause is the exact gap. (Pillar iii's settle-without-
+  relaxation counterexample reborn as pure scheduling: the relaxation fired, too late.)
+* FROZEN LOCK / SKIP-RE-EXPANSION: `frozen_lock_async`, `settled_push_noop` (pushes aimed
+  at certified vertices are provable no-ops — the fastsweep license).
+* HEALING (stretch, proved): `healing_of_stable_and_edgeFair` — WITHOUT lookahead, if `d`
+  stabilizes and every edge relaxes cofinally often (`RelaxesEdge`), the stable vector =
+  `distV`: edge-relaxed everywhere ⇒ post-fixed for `T_BF` ⇒ `≤ distV` (pillar ii's
+  `le_distV_of_le_T_BF`), invariant 1 gives `≥`. Fairness must cover pushes AND presupposes
+  every vertex settles/echo-sweeps cofinally often (only settled sources are enqueued).
+  `healing_of_finiteRange_edgeFair` discharges stability from finite per-component value
+  ranges via pillar (i)'s `exists_eventuallyConstant_of_antitone`. HONEST SEAM: the
+  finite-range hypothesis is NOT discharged — pillar (ii)'s simple-walk value universe uses
+  the infimal-proposal prefix squeeze and does not port verbatim to single-edge proposals
+  (`d u + w u x` can be a non-simple-walk cost).
+* NON-VACUITY: `trivialAsyncRun` + `trivialAsyncRun_lookahead` — the sound class is
+  inhabited; `⊤` start boundary forces the first settlement to be the source.
 
 ## Setting
 
@@ -158,15 +195,27 @@ canonical point is the GREATEST fixed point below `dInit` and equals `distV`
 | (new, pillar iii) `obtain ⟨k, rfl⟩ := Nat.le.dest h` then `induction k`: the residual `h : m ≤ m + k` mentions `k` and gets swept into the motive (IH gains a hypothesis arrow) — `clear h` before inducting | |
 | (new, pillar iii) `structure Foo where` under section variables auto-includes them as EXPLICIT params — `CertState` became `CertState V`; declare `(V : Type u)` in the header yourself. Dot-notation `run.lemma` needs the lemma named inside `namespace CertifiedRun` | |
 | (new, pillar iii) `set_option linter.unusedSectionVars false in universe u v` is a syntax ERROR and bare `... false` before other commands must be standalone (with `in` it applies to only the next decl); `omit [X] in` may NOT follow a doc comment ("unexpected token") — set the option file-wide instead | |
+| (new, pillar iv) `rcases` on a step relation whose equations mention structure PROJECTIONS of `run.σ (t+1)` (esp. `post.P = pre.P \ {p}`) dies "Dependent elimination failed" — `set pre := run.σ t; set post := run.σ (t+1); have hleg : Step w pre post := run.legal t` first, then rcases on `hleg` (free locals eliminate cleanly) | |
+| (new, pillar iv) `rw` auto-closes goals that become defeq-True INCONSISTENTLY for ℝ≥0∞ ≤: `⊤ ≤ ⊤`, `5 ≤ 5`, `1 ≤ 5` close (WithTop/Nat reduction); `0 ≤ ⊤`, `5 ≤ ⊤` do NOT — a trailing `exact le_top`/`norm_num` then dies "No goals" or leaves unsolved. Empirically adjust per goal; same for `simp at h` on `h : p ∈ ∅` (becomes False and AUTO-CLOSES the goal — drop the trailing `exact h.elim`) | |
+| (new, pillar iv) `rcases t with _ \| _ \| _ \| _ \| _ \| _ \| t` yields SEVEN cases (0..5 + tail): count the bullets — a missing bullet glues later tactics onto the wrong case, surfacing as bogus "Unknown identifier t" (rcases consumes `t` in every non-tail case). Tail case re-expresses indices as `t + 1 + 1 + 1 + …` not `t + 6`: `rw [show t+1+1+1+1+1+1 = t+6 by omega]` BEFORE simp/omega steps (simp can't use a `t + 6 ≠ k` hypothesis on the syntactic `t+1+…` term) | |
+| (new, pillar iv) ABSENT at this pin: `Finset.not_mem_empty` (use `simp` on goal, or `have h' : p ∈ ∅ := hp; simp at h'` — which auto-closes), `Finset.union_idem` (use `Finset.ext; intro q; simp`) | |
+| (new, pillar iv) `Prod.ext_iff.mp h` yields NON-beta-reduced `(b, y).1 = p.1` — `rw` can't match it syntactically; coerce first: `have hb1 : b = p.1 := (Prod.ext_iff.mp h).1` (defeq elaboration beta-reduces), then rw `hb1` | |
+| (new, pillar iv) multi-line anonymous-record literals inside a match arm (`\| _ + 1 => { d := …, U := {s}, B := ⊤,\n  P := … }`) parse-ERROR "unexpected identifier; expected '}'" — keep record literals in one line (the pillar-iii `trivialSigma` shape compiles fine) | |
+| (new, pillar iv) `have hX : insert v {s} = {s} := hU` type-mismatches when `hU` reduces to the SYMMETRIC `{s} = insert v {s}` — check direction (`hU.symm`); `show <literal form> from <term>` is the defeq bridge from projection-typed hypotheses to reduced literals | |
 
 ## Status / next step
 
-All three pillars COMPLETE, `lake build` green, zero sorries. See the status ledger
+All FOUR pillars COMPLETE, `lake build` green, zero sorries. See the status ledger
 docstrings at the end of `RelaxLFP.lean`, `Pillar2.lean` (headline:
-`canonical_point_eq_distV`), and `Pillar3.lean` (headline:
-`certified_settled_final` + `frozen_lock`). `lakefile.toml` defaultTargets:
-`RelaxLFP`, `Pillar2`, `Pillar3`. Next (successor's choice): the async echo-sweep
-refinement of `Pillar3` (echo sweeps as re-fired `relax` steps, `frozen_lock` as the
-skip-re-expansion license), or wiring the certification layer to the beyond-dijkstra
-engine's `dB[D] ≥ B′` cut sets (Lemmas W/V/d2 of the cousot recast are the missing
-box verification there).
+`canonical_point_eq_distV`), `Pillar3.lean` (headline:
+`certified_settled_final` + `frozen_lock`), and `Pillar4.lean` (headlines:
+`certified_settled_final_async` under `LookaheadBoxed`;
+`certification_fails_without_lookahead` + `cex_lookahead_violated`;
+`healing_of_stable_and_edgeFair`). `lakefile.toml` defaultTargets:
+`RelaxLFP`, `Pillar2`, `Pillar3`, `Pillar4`. Next (successor's choice): discharge the
+healing finite-range seam (port pillar ii's value-universe argument to single-edge
+`applyPush` dynamics — the prefix squeeze needs a per-edge tightness invariant), or
+wire the certification layer to the beyond-dijkstra engine's `dB[D] ≥ B′` cut sets
+(Lemmas W/V/d2 of the cousot recast are the missing box verification there), or add
+re-settlement (un-settle on post-certification value drop) to the async engine and
+prove healing WITHOUT the stability hypothesis, from fairness alone.
